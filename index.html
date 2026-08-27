@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Container Logistiek Scanner</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; }
+    .header { text-align: center; border-bottom: 2px solid #eef2f5; padding-bottom: 15px; margin-bottom: 15px; }
+    .header h2 { margin: 0; color: #1a73e8; font-size: 22px; }
+    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 13px; margin-top: 8px; background: #e8f0fe; color: #1a73e8; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; }
+    .info-item { font-size: 13px; }
+    .info-item label { font-weight: bold; color: #64748b; display: block; font-size: 11px; text-transform: uppercase; }
+    .full-width { grid-column: span 2; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { font-weight: bold; display: block; margin-bottom: 6px; font-size: 14px; }
+    input[type="text"] { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; outline: none; }
+    input[type="text"]:focus { border-color: #1a73e8; }
+    .btn-group { display: flex; gap: 10px; flex-direction: column; margin-top: 15px; }
+    button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; }
+    .btn-pickup { background-color: #1a73e8; color: white; }
+    .btn-deliver { background-color: #16a34a; color: white; }
+    .loader { text-align: center; padding: 30px; font-size: 16px; color: #64748b; }
+    .alert { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; text-align: center; }
+    .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h2 id="titleContainer">Container Check</h2>
+    <span id="statusBadge" class="status-badge">Laden...</span>
+  </div>
+
+  <div id="loader" class="loader">Gegevens ophalen...</div>
+  <div id="alertBox"></div>
+
+  <div id="content" style="display: none;">
+    <div class="info-grid">
+      <div class="info-item full-width"><label>Klant</label><span id="txtKlant">-</span></div>
+      <div class="info-item full-width"><label>Afleveradres</label><span id="txtAdres">-</span></div>
+      <div class="info-item"><label>Product</label><span id="txtProduct">-</span></div>
+      <div class="info-item"><label>Food Grade</label><span id="txtFG">-</span></div>
+      <div class="info-item"><label>Bruto Gew.</label><span id="txtBruto">-</span></div>
+      <div class="info-item"><label>Netto Gew.</label><span id="txtNetto">-</span></div>
+      <div class="info-item"><label>FG Seal Nr.</label><span id="txtSeal">-</span></div>
+      <div class="info-item"><label>Deadline</label><span id="txtDeadline">-</span></div>
+    </div>
+
+    <div class="form-group">
+      <label for="chauffeurInput">Naam Chauffeur / Kenteken *</label>
+      <input type="text" id="chauffeurInput" placeholder="Bijv. Jan - BK-123-X">
+    </div>
+
+    <div class="btn-group">
+      <button type="button" class="btn-pickup" onclick="submitStatus('Onderweg naar Klant')">🚛 Ophalen (Onderweg naar Klant)</button>
+      <button type="button" class="btn-deliver" onclick="submitStatus('Afgeleverd')">📦 Afgeleverd bij Klant</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // VERVANG DE ONDERSTAANDE LINK DOOR JOUW EIGEN APPS SCRIPT WEB APP URL:
+  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec";
+
+  var urlParams = new URLSearchParams(window.location.search);
+  var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
+  var currentRowIndex = -1;
+
+  window.onload = function() {
+    if (!currentContainerId) {
+      showError("Geen containernummer gescand. Gebruik een geldige QR-code.");
+      return;
+    }
+    document.getElementById("titleContainer").innerText = currentContainerId;
+    
+    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(currentContainerId))
+      .then(res => res.json())
+      .then(res => onDataLoaded(res))
+      .catch(err => showError("Fout bij laden: " + err.message));
+  };
+
+  function onDataLoaded(res) {
+    document.getElementById("loader").style.display = "none";
+    if (!res.success) {
+      showError(res.message);
+      return;
+    }
+
+    currentRowIndex = res.rowIndex;
+    document.getElementById("titleContainer").innerText = res.containerId;
+    document.getElementById("statusBadge").innerText = res.huidigeStatus || "In Productie";
+    document.getElementById("txtKlant").innerText = res.klant || "-";
+    document.getElementById("txtAdres").innerText = res.afleverAdres || "-";
+    document.getElementById("txtProduct").innerText = res.product || "-";
+    document.getElementById("txtFG").innerText = res.foodGrade;
+    document.getElementById("txtBruto").innerText = res.brutoGewicht ? res.brutoGewicht + " kg" : "-";
+    document.getElementById("txtNetto").innerText = res.nettoGewicht ? res.nettoGewicht + " kg" : "-";
+    document.getElementById("txtSeal").innerText = res.sealNummer || "-";
+    document.getElementById("txtDeadline").innerText = (res.deadlineDatum + " " + res.deadlineTijd).trim() || "-";
+    
+    if (res.chauffeur) {
+      document.getElementById("chauffeurInput").value = res.chauffeur;
+    }
+
+    document.getElementById("content").style.display = "block";
+  }
+
+  function submitStatus(nieuweStatus) {
+    var chauffeur = document.getElementById("chauffeurInput").value.trim();
+    if (!chauffeur) {
+      alert("Voer a.u.b. je naam of kenteken in.");
+      return;
+    }
+
+    document.getElementById("content").style.display = "none";
+    document.getElementById("loader").style.display = "block";
+    document.getElementById("loader").innerText = "Status bijwerken...";
+
+    var updateUrl = API_URL + "?action=updateStatus" +
+      "&rowIndex=" + currentRowIndex +
+      "&status=" + encodeURIComponent(nieuweStatus) +
+      "&chauffeur=" + encodeURIComponent(chauffeur);
+
+    fetch(updateUrl)
+      .then(res => res.json())
+      .then(res => {
+        document.getElementById("loader").style.display = "none";
+        if (res.success) {
+          showSuccess(res.message);
+        } else {
+          showError(res.message);
+        }
+      })
+      .catch(err => {
+        document.getElementById("loader").style.display = "none";
+        showError("Fout bij opslaan: " + err.message);
+      });
+  }
+
+  function showError(msg) {
+    document.getElementById("loader").style.display = "none";
+    document.getElementById("statusBadge").style.display = "none";
+    document.getElementById("alertBox").innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+  }
+
+  function showSuccess(msg) {
+    document.getElementById("statusBadge").innerText = "Bijgewerkt!";
+    document.getElementById("alertBox").innerHTML = '<div class="alert alert-success">' + msg + '</div>';
+  }
+</script>
+
+</body>
+</html>
