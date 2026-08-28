@@ -19,7 +19,6 @@
     
     .lang-switch { position: absolute; top: 15px; right: 15px; display: flex; gap: 4px; }
     .lang-btn { background: #e2e8f0; border: none; padding: 5px 9px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; color: #475569; transition: background 0.2s; }
-    /* GROENE ACTIEVE KNOP */
     .lang-btn.active { background: #16a34a !important; color: white !important; }
 
     .header { display: flex; align-items: center; justify-content: flex-start; gap: 12px; border-bottom: 2px solid #eef2f5; padding-bottom: 12px; margin-bottom: 15px; }
@@ -106,6 +105,7 @@
   var rawLoadedStatus = "";
   var rawTijdstipOphalen = "";
   var isScanningMode = false;
+  var currentAlertKey = ""; // Onthoudt het type melding voor directe vertaling
 
   var statusTranslations = {
     nl: {
@@ -226,6 +226,13 @@
       document.getElementById("titleContainer").innerText = t.title_scan;
     }
 
+    // Vertaal actieve foutmeldingen direct als er een taalsleutel actief is
+    if (currentAlertKey) {
+      if (currentAlertKey === "err_camera") {
+        showErrorByKey("err_camera");
+      }
+    }
+
     document.getElementById("btn-nl").classList.toggle("active", lang === "nl");
     document.getElementById("btn-en").classList.toggle("active", lang === "en");
   }
@@ -238,6 +245,7 @@
 
   function loadContainerData(containerId) {
     isScanningMode = false;
+    currentAlertKey = "";
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
@@ -382,8 +390,9 @@
       });
   }
 
- function startCameraScanner() {
+  function startCameraScanner() {
     isScanningMode = true;
+    currentAlertKey = "";
     var t = translations[currentLang];
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
@@ -400,12 +409,7 @@
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onQrCodeScanned)
       .catch(err => {
-        // Vertaal de melding netjes op basis van de gekozen taal
-        var errMessage = t.err_camera;
-        if (err && err.message) {
-          errMessage += " (" + err.message + ")";
-        }
-        showError(errMessage);
+        showErrorByKey("err_camera");
         document.getElementById("nextScanArea").style.display = "block";
       });
   }
@@ -422,6 +426,12 @@
         loadContainerData(scannedId);
       }).catch(err => console.error("Fout bij stoppen camera", err));
     }
+  }
+
+  function showErrorByKey(key) {
+    currentAlertKey = key;
+    var msg = translations[currentLang][key] || key;
+    showError(msg);
   }
 
   function showError(msg) {
