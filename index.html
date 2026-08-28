@@ -128,7 +128,7 @@
     loadContainerData(currentContainerId);
   };
 
-function loadContainerData(containerId) {
+  function loadContainerData(containerId) {
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
@@ -138,7 +138,6 @@ function loadContainerData(containerId) {
     document.getElementById("reader").style.display = "none";
     document.getElementById("alertBox").innerHTML = "";
 
-    // Met redirect follow voorkom je dat Safari blokkeert op de Google-omleiding
     fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(containerId), {
       method: "GET",
       redirect: "follow"
@@ -153,6 +152,8 @@ function loadContainerData(containerId) {
 
   function onDataLoaded(res) {
     document.getElementById("loader").style.display = "none";
+    
+    // Bij een fout (bijv. container niet gevonden): Toon fout én de knop om de volgende te scannen!
     if (!res.success) {
       showError(res.message);
       document.getElementById("nextScanArea").style.display = "block";
@@ -160,9 +161,11 @@ function loadContainerData(containerId) {
     }
 
     currentRowIndex = res.rowIndex;
+    var status = res.huidigeStatus || "In Productie";
+
     document.getElementById("titleContainer").innerText = res.containerId;
     document.getElementById("statusBadge").style.display = "inline-block";
-    document.getElementById("statusBadge").innerText = res.huidigeStatus || "In Productie";
+    document.getElementById("statusBadge").innerText = status;
     document.getElementById("txtKlant").innerText = res.klant || "-";
     document.getElementById("txtAdres").innerText = res.afleverAdres || "-";
     document.getElementById("txtProduct").innerText = res.product || "-";
@@ -177,10 +180,31 @@ function loadContainerData(containerId) {
       document.getElementById("chauffeurInput").value = res.chauffeur;
     }
 
+    // SLIME LOGICA VOOR DE KANSSEN EN STATUS-KNOPPEN:
+    var btnPickup = document.querySelector(".btn-pickup");
+    var btnDeliver = document.querySelector(".btn-deliver");
+
+    if (status === "Onderweg naar Klant") {
+      // Container is al opgehaald: Verberg 'Onderweg' knop, toon alleen 'Afgeleverd'
+      btnPickup.style.display = "none";
+      btnDeliver.style.display = "block";
+    } else if (status === "Afgeleverd") {
+      // Container is al afgeleverd: Verberg beide actieknoppen
+      btnPickup.style.display = "none";
+      btnDeliver.style.display = "none";
+      showSuccess("Deze container is al afgeleverd op " + (res.tijdstipOphalen || "een eerder moment") + ".");
+    } else {
+      // In Productie / Gereed voor Transport: Toon beide knoppen
+      btnPickup.style.display = "block";
+      btnDeliver.style.display = "block";
+    }
+
     document.getElementById("content").style.display = "block";
+    // ALTIJD de knop 'Scan Volgende Container' onderaan tonen voor snelle doorvoer!
+    document.getElementById("nextScanArea").style.display = "block";
   }
 
-function submitStatus(nieuweStatus) {
+  function submitStatus(nieuweStatus) {
     var chauffeur = document.getElementById("chauffeurInput").value.trim();
     if (!chauffeur) {
       alert("Voer a.u.b. je naam of kenteken in.");
@@ -213,6 +237,7 @@ function submitStatus(nieuweStatus) {
         } else {
           showError(res.message);
         }
+        // Altijd de scan-knop paraat houden na een actie
         document.getElementById("nextScanArea").style.display = "block";
       })
       .catch(err => {
@@ -243,11 +268,11 @@ function submitStatus(nieuweStatus) {
     html5QrCode.start({ facingMode: "environment" }, config, onQrCodeScanned)
       .catch(err => {
         showError("Kan camera niet openen. Controleer toestemmingen.");
+        document.getElementById("nextScanArea").style.display = "block";
       });
   }
 
   function onQrCodeScanned(qrCodeMessage) {
-    // STOP DE CAMERA DIRECT OM LOOPS TE VOORKOMEN
     if (html5QrCode) {
       html5QrCode.stop().then(() => {
         document.getElementById("reader").style.display = "none";
