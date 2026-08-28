@@ -335,7 +335,7 @@
       });
   }
 
-  function startCameraScanner() {
+ function startCameraScanner() {
     isScanningMode = true;
     var t = translations[currentLang];
     document.getElementById("content").style.display = "none";
@@ -352,7 +352,15 @@
 
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onQrCodeScanned)
-      .catch(err => showError(t.err_camera));
+      .catch(err => {
+        // Vertaal de melding netjes op basis van de gekozen taal
+        var errMessage = t.err_camera;
+        if (err && err.message) {
+          errMessage += " (" + err.message + ")";
+        }
+        showError(errMessage);
+        document.getElementById("nextScanArea").style.display = "block";
+      });
   }
 
   function onQrCodeScanned(qrCodeMessage) {
