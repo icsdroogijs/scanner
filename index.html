@@ -108,6 +108,7 @@
 
 <script>
   var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec"; // Controleer jouw Web App URL!
+  var BUFFER_MINUTES = 60; // Tijd in minuten dat 'Afgeleverd' vastblijft op 'Bijgewerkt!'
 
   var urlParams = new URLSearchParams(window.location.search);
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
@@ -128,7 +129,7 @@
     loadContainerData(currentContainerId);
   };
 
- function loadContainerData(containerId) {
+  function loadContainerData(containerId) {
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
@@ -147,24 +148,12 @@
         return res.json();
       })
       .then(res => onDataLoaded(res))
-      .catch(err => {
-        showError("Fout bij laden: " + err.message);
-        // ALTIJD de scanknop tonen bij een netwerk-/laadfout!
-        document.getElementById("nextScanArea").style.display = "block";
-      });
+      .catch(err => showError("Fout bij laden: " + err.message));
   }
 
-  function showError(msg) {
-    document.getElementById("loader").style.display = "none";
-    document.getElementById("alertBox").innerHTML = '<div class="alert alert-error">' + msg + '</div>';
-    // Zorg dat de knop 'Scan Volgende Container' altijd direct zichtbaar wordt bij fouten
-    document.getElementById("nextScanArea").style.display = "block";
-  }
-  
   function onDataLoaded(res) {
     document.getElementById("loader").style.display = "none";
     
-    // Bij een fout (bijv. container niet gevonden): Toon fout én de knop om de volgende te scannen!
     if (!res.success) {
       showError(res.message);
       document.getElementById("nextScanArea").style.display = "block";
@@ -172,7 +161,7 @@
     }
 
     currentRowIndex = res.rowIndex;
-    var status = res.huidigeStatus || "In Productie";
+    var status = res.huidigeStatus || "Gereed voor Transport";
 
     document.getElementById("titleContainer").innerText = res.containerId;
     document.getElementById("statusBadge").style.display = "inline-block";
@@ -191,28 +180,54 @@
       document.getElementById("chauffeurInput").value = res.chauffeur;
     }
 
-    // SLIME LOGICA VOOR DE KANSSEN EN STATUS-KNOPPEN:
-    var btnPickup = document.querySelector(".btn-pickup");
-    var btnDeliver = document.querySelector(".btn-deliver");
+    // DYNAMISCHE STATUS CYCLUS MET PICTOGRAMMEN
+    var btnArea = document.querySelector(".action-buttons");
+    btnArea.innerHTML = ""; // Wis oude knoppen
 
-    if (status === "Onderweg naar Klant") {
-      // Container is al opgehaald: Verberg 'Onderweg' knop, toon alleen 'Afgeleverd'
-      btnPickup.style.display = "none";
-      btnDeliver.style.display = "block";
+    var isRecentAfgeleverd = false;
+    if (status === "Afgeleverd" && res.tijdstipOphalen) {
+      var statusTijd = parseTimestamp(res.tijdstipOphalen);
+      if (statusTijd) {
+        var nu = new Date();
+        var verschilMinuten = (nu - statusTijd) / (1000 * 60);
+        if (verschilMinuten < BUFFER_MINUTES) {
+          isRecentAfgeleverd = true;
+        }
+      }
+    }
+
+    if (status === "Gereed voor Transport" || status === "In Productie") {
+      btnArea.innerHTML = '<button class="btn btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
+    } else if (status === "Onderweg naar Klant") {
+      btnArea.innerHTML = '<button class="btn btn-deliver" onclick="submitStatus(\'Afgeleverd\')">📦 Afgeleverd bij Klant</button>';
     } else if (status === "Afgeleverd") {
-      // Container is al afgeleverd: Verberg beide actieknoppen
-      btnPickup.style.display = "none";
-      btnDeliver.style.display = "none";
-      showSuccess("Deze container is al afgeleverd op " + (res.tijdstipOphalen || "een eerder moment") + ".");
+      if (isRecentAfgeleverd) {
+        showSuccess("Deze container is recent afgeleverd om " + (res.tijdstipOphalen.split(" ")[1] || res.tijdstipOphalen) + ".");
+      } else {
+        btnArea.innerHTML = '<button class="btn btn-pickup" style="background-color: #f39c12;" onclick="submitStatus(\'Onderweg naar ICS\')">🔄 Retour (Onderweg naar ICS)</button>';
+      }
+    } else if (status === "Onderweg naar ICS") {
+      btnArea.innerHTML = '<button class="btn btn-deliver" style="background-color: #27ae60;" onclick="submitStatus(\'Afgeleverd bij ICS\')">🏭 Afgeleverd bij ICS</button>';
+    } else if (status === "Afgeleverd bij ICS") {
+      showSuccess("Container bevindt zich weer op de locatie van ICS.");
     } else {
-      // In Productie / Gereed voor Transport: Toon beide knoppen
-      btnPickup.style.display = "block";
-      btnDeliver.style.display = "block";
+      btnArea.innerHTML = '<button class="btn btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
     }
 
     document.getElementById("content").style.display = "block";
-    // ALTIJD de knop 'Scan Volgende Container' onderaan tonen voor snelle doorvoer!
     document.getElementById("nextScanArea").style.display = "block";
+  }
+
+  // Hulpmethode om datum/tijd uit Sheets om te zetten (formaat: dd-MM-yyyy HH:mm:ss)
+  function parseTimestamp(timeStr) {
+    try {
+      var parts = timeStr.split(" ");
+      var dateParts = parts[0].split("-");
+      var timeParts = parts[1].split(":");
+      return new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1], timeParts[2]);
+    } catch(e) {
+      return null;
+    }
   }
 
   function submitStatus(nieuweStatus) {
@@ -248,7 +263,6 @@
         } else {
           showError(res.message);
         }
-        // Altijd de scan-knop paraat houden na een actie
         document.getElementById("nextScanArea").style.display = "block";
       })
       .catch(err => {
@@ -306,6 +320,7 @@
   function showError(msg) {
     document.getElementById("loader").style.display = "none";
     document.getElementById("alertBox").innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+    document.getElementById("nextScanArea").style.display = "block";
   }
 
   function showSuccess(msg) {
