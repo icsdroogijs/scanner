@@ -5,25 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Container Logistiek Scanner</title>
   
-  <!-- Koppeling voor Web App Installatie & Snelkoppeling -->
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ICS Scanner">
   <link rel="apple-touch-icon" href="ics-logo-512.png">
 
-  <!-- HTML5 QR Code Library -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
-    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; }
-  .header { display: flex; align-items: center; justify-content: flex-start; gap: 12px; border-bottom: 2px solid #eef2f5; padding-bottom: 12px; margin-bottom: 15px; }
-    .header img { 
-      height: 104px; /* Mooi groot, gelijk aan titel + badge hoogte */
-      width: auto; 
-      object-fit: contain; 
-    }
+    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; position: relative; }
+    
+    .lang-switch { position: absolute; top: 15px; right: 15px; display: flex; gap: 4px; }
+    .lang-btn { background: #e2e8f0; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; color: #475569; }
+    .lang-btn.active { background: #1a73e8; color: white; }
+
+    .header { display: flex; align-items: center; justify-content: flex-start; gap: 12px; border-bottom: 2px solid #eef2f5; padding-bottom: 12px; margin-bottom: 15px; }
+    .header img { height: 104px; width: auto; object-fit: contain; }
     .header-text { text-align: left; }
     .header h2 { margin: 0; color: #1a73e8; font-size: 20px; line-height: 1.2; }
     .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 13px; margin-top: 8px; background: #e8f0fe; color: #1a73e8; }
@@ -39,7 +38,7 @@
     button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; }
     .btn-pickup { background-color: #1a73e8; color: white; }
     .btn-deliver { background-color: #16a34a; color: white; }
-    .btn-next-scan { background-color: #7f8c8d; color: white; font-size: 16px; margin-top: 15px; padding: 16px; } /* #0284c7 */
+    .btn-next-scan { background-color: #7f8c8d; color: white; font-size: 16px; margin-top: 15px; padding: 16px; }
     .loader { text-align: center; padding: 30px; font-size: 16px; color: #64748b; }
     .alert { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; text-align: center; }
     .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
@@ -50,57 +49,118 @@
 <body>
 
 <div class="card">
-<div class="header">
+  <div class="lang-switch">
+    <button class="lang-btn" id="btn-nl" onclick="switchLanguage('nl')">NL</button>
+    <button class="lang-btn" id="btn-en" onclick="switchLanguage('en')">EN</button>
+  </div>
+
+  <div class="header">
     <img src="ics-logo-512.png" alt="ICS Logo">
     <div class="header-text">
-      <h2 id="titleContainer">Container Check</h2>
-      <span id="statusBadge" class="status-badge">Laden...</span>
+      <h2 id="titleContainer" data-i18n="title_check">Container Check</h2>
+      <span id="statusBadge" class="status-badge" data-i18n="badge_loading">Laden...</span>
     </div>
   </div>
 
-  <div id="loader" class="loader">Gegevens ophalen...</div>
+  <div id="loader" class="loader" data-i18n="msg_loading">Gegevens ophalen...</div>
   <div id="alertBox"></div>
 
-  <!-- Camera Scanner Area -->
   <div id="reader"></div>
 
   <div id="content" style="display: none;">
     <div class="info-grid">
-      <div class="info-item full-width"><label>Klant</label><span id="txtKlant">-</span></div>
-      <div class="info-item full-width"><label>Afleveradres</label><span id="txtAdres">-</span></div>
-      <div class="info-item"><label>Product</label><span id="txtProduct">-</span></div>
-      <div class="info-item"><label>Food Grade</label><span id="txtFG">-</span></div>
-      <div class="info-item"><label>Bruto Gew.</label><span id="txtBruto">-</span></div>
-      <div class="info-item"><label>Netto Gew.</label><span id="txtNetto">-</span></div>
-      <div class="info-item"><label>FG Seal Nr.</label><span id="txtSeal">-</span></div>
-      <div class="info-item"><label>Deadline</label><span id="txtDeadline">-</span></div>
+      <div class="info-item full-width"><label data-i18n="lbl_klant">Klant</label><span id="txtKlant">-</span></div>
+      <div class="info-item full-width"><label data-i18n="lbl_adres">Afleveradres</label><span id="txtAdres">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_product">Product</label><span id="txtProduct">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_fg">Food Grade</label><span id="txtFG">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_bruto">Bruto Gew.</label><span id="txtBruto">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_netto">Netto Gew.</label><span id="txtNetto">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_seal">FG Seal Nr.</label><span id="txtSeal">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_deadline">Deadline</label><span id="txtDeadline">-</span></div>
     </div>
 
-    <!-- Vervoerders Blok Ter Controle -->
     <div style="background: #eef2f5; padding: 12px; border-radius: 8px; border-left: 4px solid #1a73e8; margin-bottom: 15px;">
-      <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block;">Geplande Vervoerder (Ter controle)</label>
+      <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block;" data-i18n="lbl_vervoerder">Geplande Vervoerder (Ter controle)</label>
       <span id="txtVervoerderGroot" style="font-size: 17px; font-weight: bold; color: #1e293b; display: block; margin-top: 2px;">-</span>
     </div>
 
     <div class="form-group">
-      <label for="chauffeurInput">Naam Chauffeur / Kenteken *</label>
-      <input type="text" id="chauffeurInput" placeholder="Bijv. Jan - BK-123-X">
+      <label for="chauffeurInput" data-i18n="lbl_chauffeur_input">Naam Chauffeur / Kenteken *</label>
+      <input type="text" id="chauffeurInput" data-i18n-placeholder="ph_chauffeur" placeholder="Bijv. Jan - BK-123-X">
     </div>
 
-    <div class="btn-group">
-      <button type="button" class="btn-pickup" onclick="submitStatus('Onderweg naar Klant')">🚛 Ophalen (Onderweg naar Klant)</button>
-      <button type="button" class="btn-deliver" onclick="submitStatus('Afgeleverd')">📦 Afgeleverd bij Klant</button>
-    </div>
+    <div class="btn-group"></div>
   </div>
 
   <div id="nextScanArea" style="display: none; text-align: center;">
-    <button type="button" class="btn-next-scan" onclick="startCameraScanner()">📷 SCAN VOLGENDE CONTAINER</button>
+    <button type="button" class="btn-next-scan" onclick="startCameraScanner()" data-i18n="btn_next">📷 SCAN VOLGENDE CONTAINER</button>
   </div>
 </div>
 
 <script>
-  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec"; // Controleer jouw Web App URL!
-  var BUFFER_MINUTES = 1; // Tijd in minuten dat 'Afgeleverd' vastblijft op 'Bijgewerkt!' (Pas aan naar bijv. 1 voor testen)
+  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec";
+  var BUFFER_MINUTES = 1;
+
+  var currentLang = localStorage.getItem("ics_lang") || (navigator.language.startsWith("nl") ? "nl" : "en");
+  var rawLoadedStatus = "";
+  var rawTijdstipOphalen = "";
+
+  var translations = {
+    nl: {
+      title_check: "Container Check",
+      title_scan: "Scan Container QR-Code",
+      badge_loading: "Laden...",
+      msg_loading: "Gegevens ophalen...",
+      msg_saving: "Status opslaan...",
+      lbl_klant: "Klant",
+      lbl_adres: "Afleveradres",
+      lbl_product: "Product",
+      lbl_fg: "Food Grade",
+      lbl_bruto: "Bruto Gew.",
+      lbl_netto: "Netto Gew.",
+      lbl_seal: "FG Seal Nr.",
+      lbl_deadline: "Deadline",
+      lbl_vervoerder: "Geplande Vervoerder (Ter controle)",
+      lbl_chauffeur_input: "Naam Chauffeur / Kenteken *",
+      ph_chauffeur: "Bijv. Jan - BK-123-X",
+      btn_next: "📷 SCAN VOLGENDE CONTAINER",
+      btn_pickup: "🚚 Ophalen (Onderweg naar Klant)",
+      btn_deliver: "📦 Afgeleverd bij Klant",
+      btn_return: "🔄 Retour (Onderweg naar ICS)",
+      btn_ics: "🏭 Afgeleverd bij ICS",
+      alert_driver: "Voer a.u.b. je naam of kenteken in.",
+      alert_recent: "Deze container is recent afgeleverd om ",
+      alert_onsite: "Container bevindt zich weer op de locatie van ICS.",
+      err_camera: "Kan camera niet openen. Controleer toestemmingen."
+    },
+    en: {
+      title_check: "Container Check",
+      title_scan: "Scan Container QR Code",
+      badge_loading: "Loading...",
+      msg_loading: "Fetching data...",
+      msg_saving: "Saving status...",
+      lbl_klant: "Customer",
+      lbl_adres: "Delivery Address",
+      lbl_product: "Product",
+      lbl_fg: "Food Grade",
+      lbl_bruto: "Gross Weight",
+      lbl_netto: "Net Weight",
+      lbl_seal: "FG Seal No.",
+      lbl_deadline: "Deadline",
+      lbl_vervoerder: "Assigned Carrier (For reference)",
+      lbl_chauffeur_input: "Driver Name / License Plate *",
+      ph_chauffeur: "E.g. John - BK-123-X",
+      btn_next: "📷 SCAN NEXT CONTAINER",
+      btn_pickup: "🚚 Picked up (En route to Customer)",
+      btn_deliver: "📦 Delivered to Customer",
+      btn_return: "🔄 Return (En route to ICS)",
+      btn_ics: "🏭 Delivered at ICS",
+      alert_driver: "Please enter your name or license plate.",
+      alert_recent: "This container was recently delivered at ",
+      alert_onsite: "Container is back at the ICS location.",
+      err_camera: "Cannot open camera. Check permissions."
+    }
+  };
 
   var urlParams = new URLSearchParams(window.location.search);
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
@@ -108,6 +168,7 @@
   var html5QrCode = null;
 
   window.onload = function() {
+    applyLanguage(currentLang);
     var savedChauffeur = localStorage.getItem("ics_chauffeur_naam");
     if (savedChauffeur) {
       document.getElementById("chauffeurInput").value = savedChauffeur;
@@ -121,20 +182,39 @@
     loadContainerData(currentContainerId);
   };
 
+  function switchLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem("ics_lang", lang);
+    applyLanguage(lang);
+    if (currentRowIndex !== -1) renderActionButtons();
+  }
+
+  function applyLanguage(lang) {
+    var t = translations[lang] || translations.nl;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      var key = el.getAttribute('data-i18n');
+      if (t[key]) el.innerText = t[key];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      var key = el.getAttribute('data-i18n-placeholder');
+      if (t[key]) el.placeholder = t[key];
+    });
+
+    document.getElementById("btn-nl").classList.toggle("active", lang === "nl");
+    document.getElementById("btn-en").classList.toggle("active", lang === "en");
+  }
+
   function loadContainerData(containerId) {
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
-    document.getElementById("loader").innerText = "Gegevens ophalen...";
+    document.getElementById("loader").innerText = translations[currentLang].msg_loading;
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
     document.getElementById("reader").style.display = "none";
     document.getElementById("alertBox").innerHTML = "";
 
-    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(containerId), {
-      method: "GET",
-      redirect: "follow"
-    })
+    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(containerId), { method: "GET", redirect: "follow" })
       .then(res => {
         if (!res.ok) throw new Error("Netwerk respons was niet OK (" + res.status + ")");
         return res.json();
@@ -148,7 +228,6 @@
 
   function onDataLoaded(res) {
     document.getElementById("loader").style.display = "none";
-    
     if (!res.success) {
       showError(res.message);
       document.getElementById("nextScanArea").style.display = "block";
@@ -156,11 +235,12 @@
     }
 
     currentRowIndex = res.rowIndex;
-    var status = res.huidigeStatus || "Gereed voor Transport";
+    rawLoadedStatus = res.huidigeStatus || "Gereed voor Transport";
+    rawTijdstipOphalen = res.tijdstipOphalen || "";
 
     document.getElementById("titleContainer").innerText = res.containerId;
     document.getElementById("statusBadge").style.display = "inline-block";
-    document.getElementById("statusBadge").innerText = status;
+    document.getElementById("statusBadge").innerText = rawLoadedStatus;
     document.getElementById("txtKlant").innerText = res.klant || "-";
     document.getElementById("txtAdres").innerText = res.afleverAdres || "-";
     document.getElementById("txtProduct").innerText = res.product || "-";
@@ -175,45 +255,46 @@
       document.getElementById("chauffeurInput").value = res.chauffeur;
     }
 
-    // DYNAMISCHE STATUS CYCLUS MET PICTOGRAMMEN (Gekoppeld aan .btn-group)
-    var btnArea = document.querySelector(".btn-group");
-    if (btnArea) {
-      btnArea.innerHTML = ""; // Wis oude knoppen
-
-      var isRecentAfgeleverd = false;
-      if (status === "Afgeleverd" && res.tijdstipOphalen) {
-        var statusTijd = parseTimestamp(res.tijdstipOphalen);
-        if (statusTijd) {
-          var nu = new Date();
-          var verschilMinuten = (nu - statusTijd) / (1000 * 60);
-          if (verschilMinuten < BUFFER_MINUTES) {
-            isRecentAfgeleverd = true;
-          }
-        }
-      }
-
-      if (status === "Gereed voor Transport" || status === "In Productie") {
-        btnArea.innerHTML = '<button type="button" class="btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
-      } else if (status === "Onderweg naar Klant") {
-        btnArea.innerHTML = '<button type="button" class="btn-deliver" onclick="submitStatus(\'Afgeleverd\')">📦 Afgeleverd bij Klant</button>';
-      } else if (status === "Afgeleverd") {
-        if (isRecentAfgeleverd) {
-          var tijdTxt = res.tijdstipOphalen.includes(" ") ? res.tijdstipOphalen.split(" ")[1] : res.tijdstipOphalen;
-          showSuccess("Deze container is recent afgeleverd om " + tijdTxt + ".");
-        } else {
-          btnArea.innerHTML = '<button type="button" class="btn-pickup" style="background-color: #f39c12;" onclick="submitStatus(\'Onderweg naar ICS\')">🔄 Retour (Onderweg naar ICS)</button>';
-        }
-      } else if (status === "Onderweg naar ICS") {
-        btnArea.innerHTML = '<button type="button" class="btn-deliver" style="background-color: #27ae60;" onclick="submitStatus(\'Afgeleverd bij ICS\')">🏭 Afgeleverd bij ICS</button>';
-      } else if (status === "Afgeleverd bij ICS") {
-        showSuccess("Container bevindt zich weer op de locatie van ICS.");
-      } else {
-        btnArea.innerHTML = '<button type="button" class="btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
-      }
-    }
+    renderActionButtons();
 
     document.getElementById("content").style.display = "block";
     document.getElementById("nextScanArea").style.display = "block";
+  }
+
+  function renderActionButtons() {
+    var t = translations[currentLang];
+    var btnArea = document.querySelector(".btn-group");
+    if (!btnArea) return;
+    btnArea.innerHTML = "";
+
+    var isRecentAfgeleverd = false;
+    if (rawLoadedStatus === "Afgeleverd" && rawTijdstipOphalen) {
+      var statusTijd = parseTimestamp(rawTijdstipOphalen);
+      if (statusTijd) {
+        var nu = new Date();
+        var verschilMinuten = (nu - statusTijd) / (1000 * 60);
+        if (verschilMinuten < BUFFER_MINUTES) isRecentAfgeleverd = true;
+      }
+    }
+
+    if (rawLoadedStatus === "Gereed voor Transport" || rawLoadedStatus === "In Productie") {
+      btnArea.innerHTML = '<button type="button" class="btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">' + t.btn_pickup + '</button>';
+    } else if (rawLoadedStatus === "Onderweg naar Klant") {
+      btnArea.innerHTML = '<button type="button" class="btn-deliver" onclick="submitStatus(\'Afgeleverd\')">' + t.btn_deliver + '</button>';
+    } else if (rawLoadedStatus === "Afgeleverd") {
+      if (isRecentAfgeleverd) {
+        var tijdTxt = rawTijdstipOphalen.includes(" ") ? rawTijdstipOphalen.split(" ")[1] : rawTijdstipOphalen;
+        showSuccess(t.alert_recent + tijdTxt + ".");
+      } else {
+        btnArea.innerHTML = '<button type="button" class="btn-pickup" style="background-color: #f39c12;" onclick="submitStatus(\'Onderweg naar ICS\')">' + t.btn_return + '</button>';
+      }
+    } else if (rawLoadedStatus === "Onderweg naar ICS") {
+      btnArea.innerHTML = '<button type="button" class="btn-deliver" style="background-color: #27ae60;" onclick="submitStatus(\'Afgeleverd bij ICS\')">' + t.btn_ics + '</button>';
+    } else if (rawLoadedStatus === "Afgeleverd bij ICS") {
+      showSuccess(t.alert_onsite);
+    } else {
+      btnArea.innerHTML = '<button type="button" class="btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">' + t.btn_pickup + '</button>';
+    }
   }
 
   function parseTimestamp(timeStr) {
@@ -224,15 +305,14 @@
       var dateParts = parts[0].split("-");
       var timeParts = parts[1].split(":");
       return new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1], timeParts[2] || 0);
-    } catch(e) {
-      return null;
-    }
+    } catch(e) { return null; }
   }
 
   function submitStatus(nieuweStatus) {
+    var t = translations[currentLang];
     var chauffeur = document.getElementById("chauffeurInput").value.trim();
     if (!chauffeur) {
-      alert("Voer a.u.b. je naam of kenteken in.");
+      alert(t.alert_driver);
       return;
     }
 
@@ -240,17 +320,14 @@
 
     document.getElementById("content").style.display = "none";
     document.getElementById("loader").style.display = "block";
-    document.getElementById("loader").innerText = "Status opslaan...";
+    document.getElementById("loader").innerText = t.msg_saving;
 
     var updateUrl = API_URL + "?action=updateStatus" +
       "&rowIndex=" + currentRowIndex +
       "&status=" + encodeURIComponent(nieuweStatus) +
       "&chauffeur=" + encodeURIComponent(chauffeur);
 
-    fetch(updateUrl, {
-      method: "GET",
-      redirect: "follow"
-    })
+    fetch(updateUrl, { method: "GET", redirect: "follow" })
       .then(res => {
         if (!res.ok) throw new Error("Opslaan mislukt (" + res.status + ")");
         return res.json();
@@ -272,26 +349,23 @@
   }
 
   function startCameraScanner() {
+    var t = translations[currentLang];
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
     document.getElementById("loader").style.display = "none";
     document.getElementById("statusBadge").style.display = "none";
-    document.getElementById("titleContainer").innerText = "Scan Container QR-Code";
+    document.getElementById("titleContainer").innerText = t.title_scan;
     document.getElementById("alertBox").innerHTML = "";
     
     var readerDiv = document.getElementById("reader");
     readerDiv.style.display = "block";
 
-    if (html5QrCode) {
-      try { html5QrCode.stop(); } catch(e) {}
-    }
+    if (html5QrCode) { try { html5QrCode.stop(); } catch(e) {} }
 
     html5QrCode = new Html5Qrcode("reader");
-    var config = { fps: 10, qrbox: { width: 250, height: 250 } };
-    
-    html5QrCode.start({ facingMode: "environment" }, config, onQrCodeScanned)
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onQrCodeScanned)
       .catch(err => {
-        showError("Kan camera niet openen. Controleer toestemmingen.");
+        showError(t.err_camera);
         document.getElementById("nextScanArea").style.display = "block";
       });
   }
@@ -300,19 +374,13 @@
     if (html5QrCode) {
       html5QrCode.stop().then(() => {
         document.getElementById("reader").style.display = "none";
-        
         var scannedId = qrCodeMessage;
         if (qrCodeMessage.includes("id=")) {
           var match = qrCodeMessage.match(/id=([^&]+)/);
-          if (match && match[1]) {
-            scannedId = decodeURIComponent(match[1]);
-          }
+          if (match && match[1]) scannedId = decodeURIComponent(match[1]);
         }
-        
         loadContainerData(scannedId);
-      }).catch(err => {
-        console.error("Fout bij stoppen camera", err);
-      });
+      }).catch(err => console.error("Fout bij stoppen camera", err));
     }
   }
 
@@ -328,6 +396,5 @@
     document.getElementById("alertBox").innerHTML = '<div class="alert alert-success">' + msg + '</div>';
   }
 </script>
-  
 </body>
 </html>
