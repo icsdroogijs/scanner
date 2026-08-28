@@ -18,8 +18,9 @@
     .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; position: relative; }
     
     .lang-switch { position: absolute; top: 15px; right: 15px; display: flex; gap: 4px; }
-    .lang-btn { background: #e2e8f0; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; color: #475569; }
-    .lang-btn.active { background: #1a73e8; color: white; }
+    .lang-btn { background: #e2e8f0; border: none; padding: 5px 9px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; color: #475569; transition: background 0.2s; }
+    /* GROENE ACTIEVE KNOP */
+    .lang-btn.active { background: #16a34a !important; color: white !important; }
 
     .header { display: flex; align-items: center; justify-content: flex-start; gap: 12px; border-bottom: 2px solid #eef2f5; padding-bottom: 12px; margin-bottom: 15px; }
     .header img { height: 104px; width: auto; object-fit: contain; }
@@ -57,8 +58,8 @@
   <div class="header">
     <img src="ics-logo-512.png" alt="ICS Logo">
     <div class="header-text">
-      <h2 id="titleContainer" data-i18n="title_check">Container Check</h2>
-      <span id="statusBadge" class="status-badge" data-i18n="badge_loading">Laden...</span>
+      <h2 id="titleContainer">Container Check</h2>
+      <span id="statusBadge" class="status-badge">Laden...</span>
     </div>
   </div>
 
@@ -104,10 +105,29 @@
   var currentLang = localStorage.getItem("ics_lang") || (navigator.language.startsWith("nl") ? "nl" : "en");
   var rawLoadedStatus = "";
   var rawTijdstipOphalen = "";
+  var isScanningMode = false;
+
+  var statusTranslations = {
+    nl: {
+      "Gereed voor Transport": "Gereed voor Transport",
+      "In Productie": "In Productie",
+      "Onderweg naar Klant": "Onderweg naar Klant",
+      "Afgeleverd": "Afgeleverd bij Klant",
+      "Onderweg naar ICS": "Onderweg naar ICS",
+      "Afgeleverd bij ICS": "Afgeleverd bij ICS"
+    },
+    en: {
+      "Gereed voor Transport": "Ready for Transport",
+      "In Productie": "In Production",
+      "Onderweg naar Klant": "En Route to Customer",
+      "Afgeleverd": "Delivered to Customer",
+      "Onderweg naar ICS": "En Route to ICS",
+      "Afgeleverd bij ICS": "Delivered at ICS"
+    }
+  };
 
   var translations = {
     nl: {
-      title_check: "Container Check",
       title_scan: "Scan Container QR-Code",
       badge_loading: "Laden...",
       msg_loading: "Gegevens ophalen...",
@@ -134,7 +154,6 @@
       err_camera: "Kan camera niet openen. Controleer toestemmingen."
     },
     en: {
-      title_check: "Container Check",
       title_scan: "Scan Container QR Code",
       badge_loading: "Loading...",
       msg_loading: "Fetching data...",
@@ -186,7 +205,10 @@
     currentLang = lang;
     localStorage.setItem("ics_lang", lang);
     applyLanguage(lang);
-    if (currentRowIndex !== -1) renderActionButtons();
+    if (rawLoadedStatus) {
+      updateStatusBadgeText(rawLoadedStatus);
+      renderActionButtons();
+    }
   }
 
   function applyLanguage(lang) {
@@ -200,11 +222,22 @@
       if (t[key]) el.placeholder = t[key];
     });
 
+    if (isScanningMode) {
+      document.getElementById("titleContainer").innerText = t.title_scan;
+    }
+
     document.getElementById("btn-nl").classList.toggle("active", lang === "nl");
     document.getElementById("btn-en").classList.toggle("active", lang === "en");
   }
 
+  function updateStatusBadgeText(status) {
+    var langMap = statusTranslations[currentLang] || statusTranslations.nl;
+    var translated = langMap[status] || status;
+    document.getElementById("statusBadge").innerText = translated;
+  }
+
   function loadContainerData(containerId) {
+    isScanningMode = false;
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
@@ -240,7 +273,8 @@
 
     document.getElementById("titleContainer").innerText = res.containerId;
     document.getElementById("statusBadge").style.display = "inline-block";
-    document.getElementById("statusBadge").innerText = rawLoadedStatus;
+    updateStatusBadgeText(rawLoadedStatus);
+
     document.getElementById("txtKlant").innerText = res.klant || "-";
     document.getElementById("txtAdres").innerText = res.afleverAdres || "-";
     document.getElementById("txtProduct").innerText = res.product || "-";
@@ -349,6 +383,7 @@
   }
 
   function startCameraScanner() {
+    isScanningMode = true;
     var t = translations[currentLang];
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
@@ -391,7 +426,7 @@
   }
 
   function showSuccess(msg) {
-    document.getElementById("statusBadge").innerText = "Bijgewerkt!";
+    document.getElementById("statusBadge").innerText = (currentLang === "en" ? "Updated!" : "Bijgewerkt!");
     document.getElementById("statusBadge").style.display = "inline-block";
     document.getElementById("alertBox").innerHTML = '<div class="alert alert-success">' + msg + '</div>';
   }
