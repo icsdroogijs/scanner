@@ -128,7 +128,7 @@
     loadContainerData(currentContainerId);
   };
 
-  function loadContainerData(containerId) {
+ function loadContainerData(containerId) {
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
@@ -147,9 +147,20 @@
         return res.json();
       })
       .then(res => onDataLoaded(res))
-      .catch(err => showError("Fout bij laden: " + err.message));
+      .catch(err => {
+        showError("Fout bij laden: " + err.message);
+        // ALTIJD de scanknop tonen bij een netwerk-/laadfout!
+        document.getElementById("nextScanArea").style.display = "block";
+      });
   }
 
+  function showError(msg) {
+    document.getElementById("loader").style.display = "none";
+    document.getElementById("alertBox").innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+    // Zorg dat de knop 'Scan Volgende Container' altijd direct zichtbaar wordt bij fouten
+    document.getElementById("nextScanArea").style.display = "block";
+  }
+  
   function onDataLoaded(res) {
     document.getElementById("loader").style.display = "none";
     
