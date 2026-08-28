@@ -49,7 +49,6 @@
 
     .lang-switch { display: flex; gap: 3px; }
     .lang-btn { background: #e2e8f0; border: none; padding: 3px 7px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; color: #475569; transition: background 0.2s; }
-    /* GROENE ACTIEVE KNOP */
     .lang-btn.active { background: #16a34a !important; color: white !important; }
 
     .header { 
@@ -147,6 +146,7 @@
   var currentLang = localStorage.getItem("ics_lang") || (navigator.language.startsWith("nl") ? "nl" : "en");
   var rawLoadedStatus = "";
   var isScanningMode = false;
+  var currentAlertKey = "";
 
   var statusTranslations = {
     nl: {
@@ -183,7 +183,7 @@
       btn_ready: "✅ Gereedmelden voor Transport",
       btn_next: "📷 SCAN VOLGENDE CONTAINER",
       alert_name: "Voer a.u.b. je naam in.",
-      err_camera: "Kan camera niet openen."
+      err_camera: "Kan camera niet openen. Controleer toestemmingen."
     },
     en: {
       badge_mode: "Production Mode",
@@ -200,7 +200,7 @@
       btn_ready: "✅ Mark Ready for Transport",
       btn_next: "📷 SCAN NEXT CONTAINER",
       alert_name: "Please enter your name.",
-      err_camera: "Cannot open camera."
+      err_camera: "Cannot open camera. Check permissions."
     }
   };
 
@@ -246,6 +246,12 @@
       document.getElementById("titleContainer").innerText = t.title_scan;
     }
 
+    if (currentAlertKey) {
+      if (currentAlertKey === "err_camera") {
+        showErrorByKey("err_camera");
+      }
+    }
+
     document.getElementById("btn-nl").classList.toggle("active", lang === "nl");
     document.getElementById("btn-en").classList.toggle("active", lang === "en");
   }
@@ -258,6 +264,7 @@
 
   function loadContainerData(containerId) {
     isScanningMode = false;
+    currentAlertKey = "";
     var t = translations[currentLang];
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
@@ -335,8 +342,9 @@
       });
   }
 
- function startCameraScanner() {
+  function startCameraScanner() {
     isScanningMode = true;
+    currentAlertKey = "";
     var t = translations[currentLang];
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
@@ -352,15 +360,7 @@
 
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onQrCodeScanned)
-      .catch(err => {
-        // Vertaal de melding netjes op basis van de gekozen taal
-        var errMessage = t.err_camera;
-        if (err && err.message) {
-          errMessage += " (" + err.message + ")";
-        }
-        showError(errMessage);
-        document.getElementById("nextScanArea").style.display = "block";
-      });
+      .catch(err => showErrorByKey("err_camera"));
   }
 
   function onQrCodeScanned(qrCodeMessage) {
@@ -375,6 +375,12 @@
         loadContainerData(scannedId);
       });
     }
+  }
+
+  function showErrorByKey(key) {
+    currentAlertKey = key;
+    var msg = translations[currentLang][key] || key;
+    showError(msg);
   }
 
   function showError(msg) {
