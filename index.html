@@ -128,7 +128,7 @@
     loadContainerData(currentContainerId);
   };
 
-  function loadContainerData(containerId) {
+function loadContainerData(containerId) {
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
@@ -138,8 +138,15 @@
     document.getElementById("reader").style.display = "none";
     document.getElementById("alertBox").innerHTML = "";
 
-    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(containerId))
-      .then(res => res.json())
+    // Met redirect follow voorkom je dat Safari blokkeert op de Google-omleiding
+    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(containerId), {
+      method: "GET",
+      redirect: "follow"
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Netwerk respons was niet OK (" + res.status + ")");
+        return res.json();
+      })
       .then(res => onDataLoaded(res))
       .catch(err => showError("Fout bij laden: " + err.message));
   }
@@ -173,7 +180,7 @@
     document.getElementById("content").style.display = "block";
   }
 
-  function submitStatus(nieuweStatus) {
+function submitStatus(nieuweStatus) {
     var chauffeur = document.getElementById("chauffeurInput").value.trim();
     if (!chauffeur) {
       alert("Voer a.u.b. je naam of kenteken in.");
@@ -191,8 +198,14 @@
       "&status=" + encodeURIComponent(nieuweStatus) +
       "&chauffeur=" + encodeURIComponent(chauffeur);
 
-    fetch(updateUrl)
-      .then(res => res.json())
+    fetch(updateUrl, {
+      method: "GET",
+      redirect: "follow"
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Opslaan mislukt (" + res.status + ")");
+        return res.json();
+      })
       .then(res => {
         document.getElementById("loader").style.display = "none";
         if (res.success) {
