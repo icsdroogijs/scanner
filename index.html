@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Container Logistiek Scanner</title>
+  <!-- HTML5 QR Code Library for Universal Browser/Mobile Camera Support -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
@@ -23,10 +25,12 @@
     button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; }
     .btn-pickup { background-color: #1a73e8; color: white; }
     .btn-deliver { background-color: #16a34a; color: white; }
+    .btn-next-scan { background-color: #0284c7; color: white; font-size: 16px; margin-top: 15px; padding: 16px; }
     .loader { text-align: center; padding: 30px; font-size: 16px; color: #64748b; }
     .alert { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; text-align: center; }
     .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
     .alert-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+    #reader { width: 100%; margin-top: 15px; border-radius: 8px; overflow: hidden; display: none; }
   </style>
 </head>
 <body>
@@ -40,6 +44,9 @@
   <div id="loader" class="loader">Gegevens ophalen...</div>
   <div id="alertBox"></div>
 
+  <!-- Camera Scanner Area -->
+  <div id="reader"></div>
+
   <div id="content" style="display: none;">
     <div class="info-grid">
       <div class="info-item full-width"><label>Klant</label><span id="txtKlant">-</span></div>
@@ -52,10 +59,10 @@
       <div class="info-item"><label>Deadline</label><span id="txtDeadline">-</span></div>
     </div>
 
-<!-- OPVALLEND VERVOERDERS-BLOK TER CONTROLE -->
+    <!-- Vervoerders Blok Ter Controle -->
     <div style="background: #eef2f5; padding: 12px; border-radius: 8px; border-left: 4px solid #1a73e8; margin-bottom: 15px;">
       <label style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block;">Geplande Vervoerder (Ter controle)</label>
-      <span id="txtVervoerderGroot" style="font-size: 17px; font-weight: bold; color: #1e293b; display: block; margin-top: 2px;">Laden...</span>
+      <span id="txtVervoerderGroot" style="font-size: 17px; font-weight: bold; color: #1e293b; display: block; margin-top: 2px;">-</span>
     </div>
 
     <div class="form-group">
@@ -68,45 +75,61 @@
       <button type="button" class="btn-deliver" onclick="submitStatus('Afgeleverd')">📦 Afgeleverd bij Klant</button>
     </div>
   </div>
+
+  <div id="nextScanArea" style="display: none; text-align: center;">
+    <button type="button" class="btn-next-scan" onclick="startCameraScanner()">📷 SCAN VOLGENDE CONTAINER</button>
+  </div>
 </div>
 
 <script>
-  // VERVANG DE ONDERSTAANDE LINK DOOR JOUW APPS SCRIPT WEB APP URL INDIEN NODIG:
-  var API_URL = "https://script.google.com/macros/s/AKfycbz_JOUW_WEB_APP_ID/exec";
+  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec"; // Controleer jouw Web App URL!
 
   var urlParams = new URLSearchParams(window.location.search);
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
   var currentRowIndex = -1;
+  var html5QrCode = null;
 
   window.onload = function() {
-    // 1. HAAL OPGESLAGEN CHAUFFEURNAAM OP UIT LOKAAL GEHEUGEN VAN HET TOESTEL
     var savedChauffeur = localStorage.getItem("ics_chauffeur_naam");
     if (savedChauffeur) {
       document.getElementById("chauffeurInput").value = savedChauffeur;
     }
 
     if (!currentContainerId) {
-      showError("Geen containernummer gescand. Gebruik een geldige QR-code.");
+      // Geen ID in URL? Open direct de camera-scanner
+      startCameraScanner();
       return;
     }
-    document.getElementById("titleContainer").innerText = currentContainerId;
-    
-    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(currentContainerId))
+
+    loadContainerData(currentContainerId);
+  };
+
+  function loadContainerData(containerId) {
+    currentContainerId = containerId;
+    document.getElementById("titleContainer").innerText = containerId;
+    document.getElementById("loader").style.display = "block";
+    document.getElementById("loader").innerText = "Gegevens ophalen...";
+    document.getElementById("content").style.display = "none";
+    document.getElementById("nextScanArea").style.display = "none";
+    document.getElementById("alertBox").innerHTML = "";
+
+    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(containerId))
       .then(res => res.json())
       .then(res => onDataLoaded(res))
       .catch(err => showError("Fout bij laden: " + err.message));
-  };
+  }
 
   function onDataLoaded(res) {
-    document.getElementById("txtVervoerderGroot").innerText = res.vervoerder || "Niet opgegeven";
     document.getElementById("loader").style.display = "none";
     if (!res.success) {
       showError(res.message);
+      document.getElementById("nextScanArea").style.display = "block";
       return;
     }
 
     currentRowIndex = res.rowIndex;
     document.getElementById("titleContainer").innerText = res.containerId;
+    document.getElementById("statusBadge").style.display = "inline-block";
     document.getElementById("statusBadge").innerText = res.huidigeStatus || "In Productie";
     document.getElementById("txtKlant").innerText = res.klant || "-";
     document.getElementById("txtAdres").innerText = res.afleverAdres || "-";
@@ -116,8 +139,8 @@
     document.getElementById("txtNetto").innerText = res.nettoGewicht ? res.nettoGewicht + " kg" : "-";
     document.getElementById("txtSeal").innerText = res.sealNummer || "-";
     document.getElementById("txtDeadline").innerText = (res.deadlineDatum + " " + res.deadlineTijd).trim() || "-";
+    document.getElementById("txtVervoerderGroot").innerText = res.vervoerder || "Onbekend";
     
-    // Als er al een chauffeur in de sheet stond én nog niet in het geheugen, vul die dan in
     if (res.chauffeur && !document.getElementById("chauffeurInput").value) {
       document.getElementById("chauffeurInput").value = res.chauffeur;
     }
@@ -132,7 +155,6 @@
       return;
     }
 
-    // 2. SLA DE NAAM OP IN HET GEHEUGEN VAN HET TOESTEL VOOR DE VOLGENDE SCAN
     localStorage.setItem("ics_chauffeur_naam", chauffeur);
 
     document.getElementById("content").style.display = "none";
@@ -150,24 +172,73 @@
         document.getElementById("loader").style.display = "none";
         if (res.success) {
           showSuccess(res.message);
+          document.getElementById("nextScanArea").style.display = "block";
         } else {
           showError(res.message);
+          document.getElementById("nextScanArea").style.display = "block";
         }
       })
       .catch(err => {
         document.getElementById("loader").style.display = "none";
         showError("Fout bij opslaan: " + err.message);
+        document.getElementById("nextScanArea").style.display = "block";
       });
+  }
+
+  function startCameraScanner() {
+    document.getElementById("content").style.display = "none";
+    document.getElementById("nextScanArea").style.display = "none";
+    document.getElementById("loader").style.display = "none";
+    document.getElementById("statusBadge").style.display = "none";
+    document.getElementById("titleContainer").innerText = "Scan Container QR-Code";
+    document.getElementById("alertBox").innerHTML = "";
+    
+    var readerDiv = document.getElementById("reader");
+    readerDiv.style.display = "block";
+
+    if (!html5QrCode) {
+      html5QrCode = new Html5Qrcode("reader");
+    }
+
+    var config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    
+    html5QrCode.start({ facingMode: "environment" }, config, onQrCodeScanned)
+      .catch(err => {
+        showError("Kan camera niet openen: " + err + ". Controleer toestemmingen.");
+      });
+  }
+
+  function onQrCodeScanned(qrCodeMessage) {
+    // Stop de camera
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        document.getElementById("reader").style.display = "none";
+        
+        // Probeer het containernummer uit de QR-code URL te halen
+        var scannedId = qrCodeMessage;
+        if (qrCodeMessage.includes("id=")) {
+          var match = qrCodeMessage.match(/id=([^&]+)/);
+          if (match && match[1]) {
+            scannedId = decodeURIComponent(match[1]);
+          }
+        }
+        
+        // Laad de gegevens van het net gescande containernummer
+        loadContainerData(scannedId);
+      }).catch(err => {
+        console.error("Fout bij stoppen camera", err);
+      });
+    }
   }
 
   function showError(msg) {
     document.getElementById("loader").style.display = "none";
-    document.getElementById("statusBadge").style.display = "none";
     document.getElementById("alertBox").innerHTML = '<div class="alert alert-error">' + msg + '</div>';
   }
 
   function showSuccess(msg) {
     document.getElementById("statusBadge").innerText = "Bijgewerkt!";
+    document.getElementById("statusBadge").style.display = "inline-block";
     document.getElementById("alertBox").innerHTML = '<div class="alert alert-success">' + msg + '</div>';
   }
 </script>
