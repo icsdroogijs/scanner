@@ -1,76 +1,143 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ICS Productie & Yard Scanner</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  
+  <!-- Koppeling voor Web App Installatie & Snelkoppeling -->
+  <link rel="manifest" href="../manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ICS Productie">
+  <link rel="apple-touch-icon" href="../ics-logo-512.png">
+
+  <!-- HTML5 QR Code Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f7f9; margin: 0; padding: 15px; }
-    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; }
-    .header { display: flex; align-items: center; justify-content: flex-start; gap: 12px; border-bottom: 2px solid #eef2f5; padding-bottom: 12px; margin-bottom: 15px; }
-    .header img { height: 104px; width: auto; object-fit: contain; }
-    .header h2 { margin: 0; color: #1a73e8; font-size: 20px; }
-    .mode-badge { align-items: right; background: #e74c3c; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; background: #e8f0fe; color: #1a73e8; font-weight: bold; font-size: 14px; margin-top: 5px; }
-    .info-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    .info-table td { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-    .info-table td:first-child { color: #666; font-weight: 500; width: 40%; }
-    .btn-group { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
-    .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; color: white; cursor: pointer; text-align: center; }
-    .btn-onsite { background-color: #27ae60; }
-    .btn-ready { background-color: #2980b9; }
-    .btn-next { background-color: #7f8c8d; margin-top: 15px; }
-    .alert { padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 15px; text-align: center; font-weight: bold; }
-    .alert-error { background: #fde8e8; color: #c81e1e; }
-    .alert-success { background: #def7ec; color: #03543f; }
-    #reader { width: 100%; max-width: 400px; margin: 0 auto; }
-    .input-field { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+    
+    .card { 
+      background: white; 
+      border-radius: 12px; 
+      padding: 20px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+      max-width: 480px; 
+      margin: 0 auto; 
+      position: relative; 
+    }
+
+    /* Badge rechtsbovenin de kaart geplaatst */
+    .mode-badge { 
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: #dc2626; 
+      color: white; 
+      padding: 4px 10px; 
+      border-radius: 20px; 
+      font-size: 11px; 
+      font-weight: bold; 
+      text-transform: uppercase; 
+      letter-spacing: 0.5px;
+    }
+
+    .header { 
+      display: flex; 
+      align-items: center; 
+      justify-content: flex-start; 
+      gap: 12px; 
+      border-bottom: 2px solid #eef2f5; 
+      padding-bottom: 12px; 
+      margin-bottom: 15px; 
+    }
+
+    .header img { 
+      height: 104px; 
+      width: auto; 
+      object-fit: contain; 
+    }
+
+    .header-text { text-align: left; }
+    .header h2 { margin: 0; color: #1a73e8; font-size: 20px; line-height: 1.2; }
+    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 13px; margin-top: 8px; background: #e8f0fe; color: #1a73e8; }
+
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; }
+    .info-item { font-size: 13px; }
+    .info-item label { font-weight: bold; color: #64748b; display: block; font-size: 11px; text-transform: uppercase; }
+    .full-width { grid-column: span 2; }
+
+    .form-group { margin-bottom: 15px; }
+    .form-group label { font-weight: bold; display: block; margin-bottom: 6px; font-size: 14px; }
+    input[type="text"] { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; outline: none; }
+    input[type="text"]:focus { border-color: #1a73e8; }
+
+    .btn-group { display: flex; gap: 10px; flex-direction: column; margin-top: 15px; }
+    button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; }
+    
+    .btn-onsite { background-color: #16a34a; color: white; }
+    .btn-ready { background-color: #1a73e8; color: white; }
+    .btn-next-scan { background-color: #7f8c8d; color: white; font-size: 16px; margin-top: 15px; padding: 16px; }
+
+    .loader { text-align: center; padding: 30px; font-size: 16px; color: #64748b; }
+    .alert { padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; text-align: center; font-weight: bold; }
+    .alert-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .alert-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+    #reader { width: 100%; margin-top: 15px; border-radius: 8px; overflow: hidden; display: none; }
   </style>
 </head>
 <body>
 
 <div class="card">
-       <div><span class="mode-badge">Productie Stand</span><br></div>
+  <!-- Badge rechtsboven -->
+  <span class="mode-badge">Productie Stand</span>
+
   <div class="header">
     <img src="../ics-logo-512.png" alt="ICS Logo">
-    <div>
+    <div class="header-text">
       <h2 id="titleContainer">Productie Scanner</h2>
       <span id="statusBadge" class="status-badge" style="display:none;">-</span>
     </div>
   </div>
 
+  <div id="loader" class="loader" style="display:none;">Gegevens ophalen...</div>
   <div id="alertBox"></div>
-  <div id="loader" style="display:none; text-align:center; padding: 20px;">Laden...</div>
+
+  <!-- Camera Scanner Area -->
   <div id="reader"></div>
 
-  <div id="content" style="display:none;">
-    <label style="font-size:12px; color:#666; font-weight:bold;">Medewerker Productie / Yard:</label>
-    <input type="text" id="medewerkerInput" class="input-field" placeholder="Vul je naam in...">
+  <div id="content" style="display: none;">
+    <div class="info-grid">
+      <div class="info-item full-width"><label>Klant</label><span id="txtKlant" style="font-weight:bold;">-</span></div>
+      <div class="info-item full-width"><label>Afleveradres</label><span id="txtAdres">-</span></div>
+      <div class="info-item"><label>Product</label><span id="txtProduct">-</span></div>
+      <div class="info-item"><label>Netto Gew.</label><span id="txtNetto">-</span></div>
+    </div>
 
-    <table class="info-table">
-      <tr><td>Klant:</td><td id="txtKlant" style="font-weight:bold;">-</td></tr>
-      <tr><td>Afleveradres:</td><td id="txtAdres">-</td></tr>
-      <tr><td>Product:</td><td id="txtProduct">-</td></tr>
-      <tr><td>Netto Gew.:</td><td id="txtNetto">-</td></tr>
-    </table>
+    <div class="form-group">
+      <label for="medewerkerInput">Medewerker Productie / Yard *</label>
+      <input type="text" id="medewerkerInput" placeholder="Vul je naam in...">
+    </div>
 
     <div class="btn-group">
       <!-- Direct Inboeken / On Site knop -->
-      <button type="button" class="btn btn-onsite" onclick="submitStatus('Afgeleverd bij ICS')">🏭 On Site Inboeken (Retour ICS)</button>
+      <button type="button" class="btn-onsite" onclick="submitStatus('Afgeleverd bij ICS')">🏭 On Site Inboeken (Retour ICS)</button>
       
-      <!-- Optioneel: Voorbereiden voor transport -->
-      <button type="button" class="btn btn-ready" onclick="submitStatus('Gereed voor Transport')">✅ Gereedmelden voor Transport</button>
+      <!-- Voorbereiden voor transport -->
+      <button type="button" class="btn-ready" onclick="submitStatus('Gereed voor Transport')">✅ Gereedmelden voor Transport</button>
     </div>
   </div>
 
-  <div id="nextScanArea" style="display:none;">
-    <button type="button" class="btn btn-next" onclick="startCameraScanner()">📷 SCAN VOLGENDE CONTAINER</button>
+  <div id="nextScanArea" style="display: none; text-align: center;">
+    <button type="button" class="btn-next-scan" onclick="startCameraScanner()">📷 SCAN VOLGENDE CONTAINER</button>
   </div>
 </div>
 
 <script>
-  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec"; // Controleer jouw Web App URL!
+  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec";
 
   var urlParams = new URLSearchParams(window.location.search);
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
@@ -95,6 +162,7 @@
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
+    document.getElementById("loader").innerText = "Gegevens ophalen...";
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
     document.getElementById("reader").style.display = "none";
@@ -207,5 +275,6 @@
     document.getElementById("alertBox").innerHTML = '<div class="alert alert-success">' + msg + '</div>';
   }
 </script>
+
 </body>
 </html>
