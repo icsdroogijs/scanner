@@ -113,7 +113,6 @@
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
   var currentRowIndex = -1;
   var html5QrCode = null;
-  var isCameraRunning = false;
 
   window.onload = function() {
     var savedChauffeur = localStorage.getItem("ics_chauffeur_naam");
@@ -174,7 +173,6 @@
     document.getElementById("content").style.display = "block";
   }
 
-  // OPTIMISTISCHE INSTANT UPDATE (Geen wachttijd voor de chauffeur!)
   function submitStatus(nieuweStatus) {
     var chauffeur = document.getElementById("chauffeurInput").value.trim();
     if (!chauffeur) {
@@ -184,19 +182,31 @@
 
     localStorage.setItem("ics_chauffeur_naam", chauffeur);
 
-    // DIRECT FEEDBACK TONEN AAN CHAUFFEUR (DIRECT KLAAR)
     document.getElementById("content").style.display = "none";
-    showSuccess("Status opgeslagen: " + nieuweStatus);
-    document.getElementById("nextScanArea").style.display = "block";
+    document.getElementById("loader").style.display = "block";
+    document.getElementById("loader").innerText = "Status opslaan...";
 
-    // ONDERWATER HET VERZOEK NAAR GOOGLE STUREN
     var updateUrl = API_URL + "?action=updateStatus" +
       "&rowIndex=" + currentRowIndex +
       "&status=" + encodeURIComponent(nieuweStatus) +
       "&chauffeur=" + encodeURIComponent(chauffeur);
 
-    fetch(updateUrl, { mode: 'no-cors' }) // Verstuurt het direct op de achtergrond
-      .catch(err => console.error("Achtergrond sync fout:", err));
+    fetch(updateUrl)
+      .then(res => res.json())
+      .then(res => {
+        document.getElementById("loader").style.display = "none";
+        if (res.success) {
+          showSuccess(res.message);
+        } else {
+          showError(res.message);
+        }
+        document.getElementById("nextScanArea").style.display = "block";
+      })
+      .catch(err => {
+        document.getElementById("loader").style.display = "none";
+        showError("Fout bij opslaan: " + err.message);
+        document.getElementById("nextScanArea").style.display = "block";
+      });
   }
 
   function startCameraScanner() {
@@ -210,37 +220,37 @@
     var readerDiv = document.getElementById("reader");
     readerDiv.style.display = "block";
 
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("reader");
+    if (html5QrCode) {
+      try { html5QrCode.stop(); } catch(e) {}
     }
 
-    if (isCameraRunning) {
-      return;
-    }
-
-    var config = { fps: 15, qrbox: { width: 250, height: 250 } };
+    html5QrCode = new Html5Qrcode("reader");
+    var config = { fps: 10, qrbox: { width: 250, height: 250 } };
     
     html5QrCode.start({ facingMode: "environment" }, config, onQrCodeScanned)
-      .then(() => { isCameraRunning = true; })
       .catch(err => {
-        showError("Kan camera niet openen: " + err + ". Controleer toestemmingen.");
+        showError("Kan camera niet openen. Controleer toestemmingen.");
       });
   }
 
   function onQrCodeScanned(qrCodeMessage) {
-    if (html5QrCode && isCameraRunning) {
-      html5QrCode.pause();
-      
-      var scannedId = qrCodeMessage;
-      if (qrCodeMessage.includes("id=")) {
-        var match = qrCodeMessage.match(/id=([^&]+)/);
-        if (match && match[1]) {
-          scannedId = decodeURIComponent(match[1]);
+    // STOP DE CAMERA DIRECT OM LOOPS TE VOORKOMEN
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        document.getElementById("reader").style.display = "none";
+        
+        var scannedId = qrCodeMessage;
+        if (qrCodeMessage.includes("id=")) {
+          var match = qrCodeMessage.match(/id=([^&]+)/);
+          if (match && match[1]) {
+            scannedId = decodeURIComponent(match[1]);
+          }
         }
-      }
-      
-      loadContainerData(scannedId);
-      setTimeout(() => { html5QrCode.resume(); }, 500);
+        
+        loadContainerData(scannedId);
+      }).catch(err => {
+        console.error("Fout bij stoppen camera", err);
+      });
     }
   }
 
@@ -255,6 +265,6 @@
     document.getElementById("alertBox").innerHTML = '<div class="alert alert-success">' + msg + '</div>';
   }
 </script>
-
+  
 </body>
 </html>
