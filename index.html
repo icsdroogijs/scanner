@@ -108,7 +108,9 @@
 
 <script>
   var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec"; // Controleer jouw Web App URL!
-  var BUFFER_MINUTES = 1; // Tijd in minuten dat 'Afgeleverd' vastblijft op 'Bijgewerkt!'
+<script>
+  var API_URL = "https://script.google.com/macros/s/AKfycbz_JOUW_WEB_APP_ID/exec"; // Controleer jouw Web App URL!
+  var BUFFER_MINUTES = 1; // Tijd in minuten dat 'Afgeleverd' vastblijft op 'Bijgewerkt!' (Pas aan naar bijv. 1 voor testen)
 
   var urlParams = new URLSearchParams(window.location.search);
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
@@ -148,7 +150,10 @@
         return res.json();
       })
       .then(res => onDataLoaded(res))
-      .catch(err => showError("Fout bij laden: " + err.message));
+      .catch(err => {
+        showError("Fout bij laden: " + err.message);
+        document.getElementById("nextScanArea").style.display = "block";
+      });
   }
 
   function onDataLoaded(res) {
@@ -180,51 +185,55 @@
       document.getElementById("chauffeurInput").value = res.chauffeur;
     }
 
-    // DYNAMISCHE STATUS CYCLUS MET PICTOGRAMMEN
-    var btnArea = document.querySelector(".action-buttons");
-    btnArea.innerHTML = ""; // Wis oude knoppen
+    // DYNAMISCHE STATUS CYCLUS MET PICTOGRAMMEN (Gekoppeld aan .btn-group)
+    var btnArea = document.querySelector(".btn-group");
+    if (btnArea) {
+      btnArea.innerHTML = ""; // Wis oude knoppen
 
-    var isRecentAfgeleverd = false;
-    if (status === "Afgeleverd" && res.tijdstipOphalen) {
-      var statusTijd = parseTimestamp(res.tijdstipOphalen);
-      if (statusTijd) {
-        var nu = new Date();
-        var verschilMinuten = (nu - statusTijd) / (1000 * 60);
-        if (verschilMinuten < BUFFER_MINUTES) {
-          isRecentAfgeleverd = true;
+      var isRecentAfgeleverd = false;
+      if (status === "Afgeleverd" && res.tijdstipOphalen) {
+        var statusTijd = parseTimestamp(res.tijdstipOphalen);
+        if (statusTijd) {
+          var nu = new Date();
+          var verschilMinuten = (nu - statusTijd) / (1000 * 60);
+          if (verschilMinuten < BUFFER_MINUTES) {
+            isRecentAfgeleverd = true;
+          }
         }
       }
-    }
 
-    if (status === "Gereed voor Transport" || status === "In Productie") {
-      btnArea.innerHTML = '<button class="btn btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
-    } else if (status === "Onderweg naar Klant") {
-      btnArea.innerHTML = '<button class="btn btn-deliver" onclick="submitStatus(\'Afgeleverd\')">📦 Afgeleverd bij Klant</button>';
-    } else if (status === "Afgeleverd") {
-      if (isRecentAfgeleverd) {
-        showSuccess("Deze container is recent afgeleverd om " + (res.tijdstipOphalen.split(" ")[1] || res.tijdstipOphalen) + ".");
+      if (status === "Gereed voor Transport" || status === "In Productie") {
+        btnArea.innerHTML = '<button type="button" class="btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
+      } else if (status === "Onderweg naar Klant") {
+        btnArea.innerHTML = '<button type="button" class="btn-deliver" onclick="submitStatus(\'Afgeleverd\')">📦 Afgeleverd bij Klant</button>';
+      } else if (status === "Afgeleverd") {
+        if (isRecentAfgeleverd) {
+          var tijdTxt = res.tijdstipOphalen.includes(" ") ? res.tijdstipOphalen.split(" ")[1] : res.tijdstipOphalen;
+          showSuccess("Deze container is recent afgeleverd om " + tijdTxt + ".");
+        } else {
+          btnArea.innerHTML = '<button type="button" class="btn-pickup" style="background-color: #f39c12;" onclick="submitStatus(\'Onderweg naar ICS\')">🔄 Retour (Onderweg naar ICS)</button>';
+        }
+      } else if (status === "Onderweg naar ICS") {
+        btnArea.innerHTML = '<button type="button" class="btn-deliver" style="background-color: #27ae60;" onclick="submitStatus(\'Afgeleverd bij ICS\')">🏭 Afgeleverd bij ICS</button>';
+      } else if (status === "Afgeleverd bij ICS") {
+        showSuccess("Container bevindt zich weer op de locatie van ICS.");
       } else {
-        btnArea.innerHTML = '<button class="btn btn-pickup" style="background-color: #f39c12;" onclick="submitStatus(\'Onderweg naar ICS\')">🔄 Retour (Onderweg naar ICS)</button>';
+        btnArea.innerHTML = '<button type="button" class="btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
       }
-    } else if (status === "Onderweg naar ICS") {
-      btnArea.innerHTML = '<button class="btn btn-deliver" style="background-color: #27ae60;" onclick="submitStatus(\'Afgeleverd bij ICS\')">🏭 Afgeleverd bij ICS</button>';
-    } else if (status === "Afgeleverd bij ICS") {
-      showSuccess("Container bevindt zich weer op de locatie van ICS.");
-    } else {
-      btnArea.innerHTML = '<button class="btn btn-pickup" onclick="submitStatus(\'Onderweg naar Klant\')">🚚 Ophalen (Onderweg naar Klant)</button>';
     }
 
     document.getElementById("content").style.display = "block";
     document.getElementById("nextScanArea").style.display = "block";
   }
 
-  // Hulpmethode om datum/tijd uit Sheets om te zetten (formaat: dd-MM-yyyy HH:mm:ss)
   function parseTimestamp(timeStr) {
+    if (!timeStr) return null;
     try {
-      var parts = timeStr.split(" ");
+      var parts = timeStr.toString().trim().split(" ");
+      if (parts.length < 2) return null;
       var dateParts = parts[0].split("-");
       var timeParts = parts[1].split(":");
-      return new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1], timeParts[2]);
+      return new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1], timeParts[2] || 0);
     } catch(e) {
       return null;
     }
