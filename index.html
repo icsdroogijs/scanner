@@ -65,20 +65,14 @@
 </div>
 
 <script>
-  // VERVANG DE ONDERSTAANDE LINK DOOR JOUW APPS SCRIPT WEB APP URL INDIEN NODIG:
-  var API_URL = "https://script.google.com/macros/s/AKfycbz_JOUW_WEB_APP_ID/exec";
+  // VERVANG DE ONDERSTAANDE LINK DOOR JOUW EIGEN APPS SCRIPT WEB APP URL:
+  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec";
 
   var urlParams = new URLSearchParams(window.location.search);
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
   var currentRowIndex = -1;
 
   window.onload = function() {
-    // 1. HAAL OPGESLAGEN CHAUFFEURNAAM OP UIT LOKAAL GEHEUGEN VAN HET TOESTEL
-    var savedChauffeur = localStorage.getItem("ics_chauffeur_naam");
-    if (savedChauffeur) {
-      document.getElementById("chauffeurInput").value = savedChauffeur;
-    }
-
     if (!currentContainerId) {
       showError("Geen containernummer gescand. Gebruik een geldige QR-code.");
       return;
@@ -110,8 +104,7 @@
     document.getElementById("txtSeal").innerText = res.sealNummer || "-";
     document.getElementById("txtDeadline").innerText = (res.deadlineDatum + " " + res.deadlineTijd).trim() || "-";
     
-    // Als er al een chauffeur in de sheet stond én nog niet in het geheugen, vul die dan in
-    if (res.chauffeur && !document.getElementById("chauffeurInput").value) {
+    if (res.chauffeur) {
       document.getElementById("chauffeurInput").value = res.chauffeur;
     }
 
@@ -124,9 +117,6 @@
       alert("Voer a.u.b. je naam of kenteken in.");
       return;
     }
-
-    // 2. SLA DE NAAM OP IN HET GEHEUGEN VAN HET TOESTEL VOOR DE VOLGENDE SCAN
-    localStorage.setItem("ics_chauffeur_naam", chauffeur);
 
     document.getElementById("content").style.display = "none";
     document.getElementById("loader").style.display = "block";
