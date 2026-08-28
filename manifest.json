@@ -1,5 +1,5 @@
 {
-  "name": "Container Logistiek Scanner",
+  "name": "ICS Container Scanner",
   "short_name": "ICS Scanner",
   "start_url": "/?mode=standalone",
   "display": "standalone",
@@ -7,12 +7,12 @@
   "theme_color": "#1a73e8",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+      "src": "ics-logo-512.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+      "src": "ics-logo-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
