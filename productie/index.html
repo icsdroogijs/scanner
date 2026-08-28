@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ICS Productie & Yard Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f7f9; margin: 0; padding: 15px; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 500px; margin: 0 auto; }
+    .header { display: flex; align-items: center; justify-content: flex-start; gap: 12px; border-bottom: 2px solid #eef2f5; padding-bottom: 12px; margin-bottom: 15px; }
+    .header img { height: 104px; width: auto; object-fit: contain; }
+    .header h2 { margin: 0; color: #2c3e50; font-size: 20px; }
+    .mode-badge { background: #e74c3c; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; background: #e8f0fe; color: #1a73e8; font-weight: bold; font-size: 14px; margin-top: 5px; }
+    .info-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .info-table td { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+    .info-table td:first-child { color: #666; font-weight: 500; width: 40%; }
+    .btn-group { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+    .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; color: white; cursor: pointer; text-align: center; }
+    .btn-onsite { background-color: #27ae60; }
+    .btn-ready { background-color: #2980b9; }
+    .btn-next { background-color: #7f8c8d; margin-top: 15px; }
+    .alert { padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 15px; text-align: center; font-weight: bold; }
+    .alert-error { background: #fde8e8; color: #c81e1e; }
+    .alert-success { background: #def7ec; color: #03543f; }
+    #reader { width: 100%; max-width: 400px; margin: 0 auto; }
+    .input-field { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <img src="../ics-logo-512.png" alt="ICS Logo">
+    <div>
+      <h2 id="titleContainer">Productie Scanner</h2>
+      <span class="mode-badge">Productie Stand</span><br>
+      <span id="statusBadge" class="status-badge" style="display:none;">-</span>
+    </div>
+  </div>
+
+  <div id="alertBox"></div>
+  <div id="loader" style="display:none; text-align:center; padding: 20px;">Laden...</div>
+  <div id="reader"></div>
+
+  <div id="content" style="display:none;">
+    <label style="font-size:12px; color:#666; font-weight:bold;">Medewerker Productie / Yard:</label>
+    <input type="text" id="medewerkerInput" class="input-field" placeholder="Vul je naam in...">
+
+    <table class="info-table">
+      <tr><td>Klant:</td><td id="txtKlant" style="font-weight:bold;">-</td></tr>
+      <tr><td>Afleveradres:</td><td id="txtAdres">-</td></tr>
+      <tr><td>Product:</td><td id="txtProduct">-</td></tr>
+      <tr><td>Netto Gew.:</td><td id="txtNetto">-</td></tr>
+    </table>
+
+    <div class="btn-group">
+      <!-- Direct Inboeken / On Site knop -->
+      <button type="button" class="btn btn-onsite" onclick="submitStatus('Afgeleverd bij ICS')">🏭 On Site Inboeken (Retour ICS)</button>
+      
+      <!-- Optioneel: Voorbereiden voor transport -->
+      <button type="button" class="btn btn-ready" onclick="submitStatus('Gereed voor Transport')">✅ Gereedmelden voor Transport</button>
+    </div>
+  </div>
+
+  <div id="nextScanArea" style="display:none;">
+    <button type="button" class="btn btn-next" onclick="startCameraScanner()">📷 SCAN VOLGENDE CONTAINER</button>
+  </div>
+</div>
+
+<script>
+  var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec"; // Controleer jouw Web App URL!
+
+  var urlParams = new URLSearchParams(window.location.search);
+  var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
+  var currentRowIndex = -1;
+  var html5QrCode = null;
+
+  window.onload = function() {
+    var savedUser = localStorage.getItem("ics_prod_user");
+    if (savedUser) {
+      document.getElementById("medewerkerInput").value = savedUser;
+    }
+
+    if (!currentContainerId) {
+      startCameraScanner();
+      return;
+    }
+
+    loadContainerData(currentContainerId);
+  };
+
+  function loadContainerData(containerId) {
+    currentContainerId = containerId;
+    document.getElementById("titleContainer").innerText = containerId;
+    document.getElementById("loader").style.display = "block";
+    document.getElementById("content").style.display = "none";
+    document.getElementById("nextScanArea").style.display = "none";
+    document.getElementById("reader").style.display = "none";
+    document.getElementById("alertBox").innerHTML = "";
+
+    fetch(API_URL + "?action=getDetails&id=" + encodeURIComponent(containerId), { method: "GET", redirect: "follow" })
+      .then(res => res.json())
+      .then(res => onDataLoaded(res))
+      .catch(err => showError("Fout bij laden: " + err.message));
+  }
+
+  function onDataLoaded(res) {
+    document.getElementById("loader").style.display = "none";
+    if (!res.success) {
+      showError(res.message);
+      document.getElementById("nextScanArea").style.display = "block";
+      return;
+    }
+
+    currentRowIndex = res.rowIndex;
+    document.getElementById("titleContainer").innerText = res.containerId;
+    document.getElementById("statusBadge").style.display = "inline-block";
+    document.getElementById("statusBadge").innerText = res.huidigeStatus || "Onbekend";
+    document.getElementById("txtKlant").innerText = res.klant || "-";
+    document.getElementById("txtAdres").innerText = res.afleverAdres || "-";
+    document.getElementById("txtProduct").innerText = res.product || "-";
+    document.getElementById("txtNetto").innerText = res.nettoGewicht ? res.nettoGewicht + " kg" : "-";
+
+    document.getElementById("content").style.display = "block";
+    document.getElementById("nextScanArea").style.display = "block";
+  }
+
+  function submitStatus(nieuweStatus) {
+    var medewerker = document.getElementById("medewerkerInput").value.trim();
+    if (!medewerker) {
+      alert("Voer a.u.b. je naam in.");
+      return;
+    }
+
+    localStorage.setItem("ics_prod_user", medewerker);
+
+    document.getElementById("content").style.display = "none";
+    document.getElementById("loader").style.display = "block";
+    document.getElementById("loader").innerText = "Status opslaan...";
+
+    var updateUrl = API_URL + "?action=updateStatus" +
+      "&rowIndex=" + currentRowIndex +
+      "&status=" + encodeURIComponent(nieuweStatus) +
+      "&chauffeur=" + encodeURIComponent("Prod: " + medewerker);
+
+    fetch(updateUrl, { method: "GET", redirect: "follow" })
+      .then(res => res.json())
+      .then(res => {
+        document.getElementById("loader").style.display = "none";
+        if (res.success) {
+          showSuccess("Status bijgewerkt naar: " + nieuweStatus);
+        } else {
+          showError(res.message);
+        }
+        document.getElementById("nextScanArea").style.display = "block";
+      })
+      .catch(err => {
+        document.getElementById("loader").style.display = "none";
+        showError("Fout bij opslaan: " + err.message);
+        document.getElementById("nextScanArea").style.display = "block";
+      });
+  }
+
+  function startCameraScanner() {
+    document.getElementById("content").style.display = "none";
+    document.getElementById("nextScanArea").style.display = "none";
+    document.getElementById("loader").style.display = "none";
+    document.getElementById("statusBadge").style.display = "none";
+    document.getElementById("titleContainer").innerText = "Scan QR (Productie)";
+    document.getElementById("alertBox").innerHTML = "";
+    
+    var readerDiv = document.getElementById("reader");
+    readerDiv.style.display = "block";
+
+    if (html5QrCode) { try { html5QrCode.stop(); } catch(e) {} }
+
+    html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onQrCodeScanned)
+      .catch(err => showError("Kan camera niet openen."));
+  }
+
+  function onQrCodeScanned(qrCodeMessage) {
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        document.getElementById("reader").style.display = "none";
+        var scannedId = qrCodeMessage;
+        if (qrCodeMessage.includes("id=")) {
+          var match = qrCodeMessage.match(/id=([^&]+)/);
+          if (match && match[1]) scannedId = decodeURIComponent(match[1]);
+        }
+        loadContainerData(scannedId);
+      });
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById("loader").style.display = "none";
+    document.getElementById("alertBox").innerHTML = '<div class="alert alert-error">' + msg + '</div>';
+    document.getElementById("nextScanArea").style.display = "block";
+  }
+
+  function showSuccess(msg) {
+    document.getElementById("statusBadge").innerText = "Bijgewerkt!";
+    document.getElementById("statusBadge").style.display = "inline-block";
+    document.getElementById("alertBox").innerHTML = '<div class="alert alert-success">' + msg + '</div>';
+  }
+</script>
+</body>
+</html>
