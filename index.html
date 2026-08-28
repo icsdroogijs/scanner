@@ -174,6 +174,7 @@
     document.getElementById("content").style.display = "block";
   }
 
+  // OPTIMISTISCHE INSTANT UPDATE (Geen wachttijd voor de chauffeur!)
   function submitStatus(nieuweStatus) {
     var chauffeur = document.getElementById("chauffeurInput").value.trim();
     if (!chauffeur) {
@@ -183,31 +184,19 @@
 
     localStorage.setItem("ics_chauffeur_naam", chauffeur);
 
+    // DIRECT FEEDBACK TONEN AAN CHAUFFEUR (DIRECT KLAAR)
     document.getElementById("content").style.display = "none";
-    document.getElementById("loader").style.display = "block";
-    document.getElementById("loader").innerText = "Status bijwerken...";
+    showSuccess("Status opgeslagen: " + nieuweStatus);
+    document.getElementById("nextScanArea").style.display = "block";
 
+    // ONDERWATER HET VERZOEK NAAR GOOGLE STUREN
     var updateUrl = API_URL + "?action=updateStatus" +
       "&rowIndex=" + currentRowIndex +
       "&status=" + encodeURIComponent(nieuweStatus) +
       "&chauffeur=" + encodeURIComponent(chauffeur);
 
-    fetch(updateUrl)
-      .then(res => res.json())
-      .then(res => {
-        document.getElementById("loader").style.display = "none";
-        if (res.success) {
-          showSuccess(res.message);
-        } else {
-          showError(res.message);
-        }
-        document.getElementById("nextScanArea").style.display = "block";
-      })
-      .catch(err => {
-        document.getElementById("loader").style.display = "none";
-        showError("Fout bij opslaan: " + err.message);
-        document.getElementById("nextScanArea").style.display = "block";
-      });
+    fetch(updateUrl, { mode: 'no-cors' }) // Verstuurt het direct op de achtergrond
+      .catch(err => console.error("Achtergrond sync fout:", err));
   }
 
   function startCameraScanner() {
@@ -226,10 +215,10 @@
     }
 
     if (isCameraRunning) {
-      return; // Camera draait al, geen nieuwe toestemming nodig!
+      return;
     }
 
-    var config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    var config = { fps: 15, qrbox: { width: 250, height: 250 } };
     
     html5QrCode.start({ facingMode: "environment" }, config, onQrCodeScanned)
       .then(() => { isCameraRunning = true; })
@@ -239,7 +228,6 @@
   }
 
   function onQrCodeScanned(qrCodeMessage) {
-    // Pauzeer het scannen tijdelijk in plaats van de camera af te sluiten
     if (html5QrCode && isCameraRunning) {
       html5QrCode.pause();
       
@@ -252,9 +240,7 @@
       }
       
       loadContainerData(scannedId);
-      
-      // Hervat de scanner klaar voor de volgende ronde
-      setTimeout(() => { html5QrCode.resume(); }, 1000);
+      setTimeout(() => { html5QrCode.resume(); }, 500);
     }
   }
 
