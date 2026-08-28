@@ -5,14 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ICS Productie & Yard Scanner</title>
   
-  <!-- Koppeling voor Web App Installatie & Snelkoppeling -->
   <link rel="manifest" href="../manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ICS Productie">
   <link rel="apple-touch-icon" href="../ics-logo-512.png">
 
-  <!-- HTML5 QR Code Library -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   
   <style>
@@ -29,11 +27,16 @@
       position: relative; 
     }
 
-    /* Badge rechtsbovenin de kaart geplaatst */
-    .mode-badge { 
+    .top-controls {
       position: absolute;
       top: 15px;
       right: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mode-badge { 
       background: #dc2626; 
       color: white; 
       padding: 4px 10px; 
@@ -44,6 +47,10 @@
       letter-spacing: 0.5px;
     }
 
+    .lang-switch { display: flex; gap: 3px; }
+    .lang-btn { background: #e2e8f0; border: none; padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; color: #475569; }
+    .lang-btn.active { background: #dc2626; color: white; }
+
     .header { 
       display: flex; 
       align-items: center; 
@@ -52,14 +59,10 @@
       border-bottom: 2px solid #eef2f5; 
       padding-bottom: 12px; 
       margin-bottom: 15px; 
+      margin-top: 15px;
     }
 
-    .header img { 
-      height: 104px; 
-      width: auto; 
-      object-fit: contain; 
-    }
-
+    .header img { height: 104px; width: auto; object-fit: contain; }
     .header-text { text-align: left; }
     .header h2 { margin: 0; color: #1a73e8; font-size: 20px; line-height: 1.2; }
     .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 13px; margin-top: 8px; background: #e8f0fe; color: #1a73e8; }
@@ -92,52 +95,94 @@
 <body>
 
 <div class="card">
-  <!-- Badge rechtsboven -->
-  <span class="mode-badge">Productie Stand</span>
+  <div class="top-controls">
+    <span class="mode-badge" data-i18n="badge_mode">Productie Stand</span>
+    <div class="lang-switch">
+      <button class="lang-btn" id="btn-nl" onclick="switchLanguage('nl')">NL</button>
+      <button class="lang-btn" id="btn-en" onclick="switchLanguage('en')">EN</button>
+    </div>
+  </div>
 
   <div class="header">
     <img src="../ics-logo-512.png" alt="ICS Logo">
     <div class="header-text">
-      <h2 id="titleContainer">Productie Scanner</h2>
+      <h2 id="titleContainer" data-i18n="title_prod">Productie Scanner</h2>
       <span id="statusBadge" class="status-badge" style="display:none;">-</span>
     </div>
   </div>
 
-  <div id="loader" class="loader" style="display:none;">Gegevens ophalen...</div>
+  <div id="loader" class="loader" style="display:none;" data-i18n="msg_loading">Gegevens ophalen...</div>
   <div id="alertBox"></div>
 
-  <!-- Camera Scanner Area -->
   <div id="reader"></div>
 
   <div id="content" style="display: none;">
     <div class="info-grid">
-      <div class="info-item full-width"><label>Klant</label><span id="txtKlant" style="font-weight:bold;">-</span></div>
-      <div class="info-item full-width"><label>Afleveradres</label><span id="txtAdres">-</span></div>
-      <div class="info-item"><label>Product</label><span id="txtProduct">-</span></div>
-      <div class="info-item"><label>Netto Gew.</label><span id="txtNetto">-</span></div>
+      <div class="info-item full-width"><label data-i18n="lbl_klant">Klant</label><span id="txtKlant" style="font-weight:bold;">-</span></div>
+      <div class="info-item full-width"><label data-i18n="lbl_adres">Afleveradres</label><span id="txtAdres">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_product">Product</label><span id="txtProduct">-</span></div>
+      <div class="info-item"><label data-i18n="lbl_netto">Netto Gew.</label><span id="txtNetto">-</span></div>
     </div>
 
     <div class="form-group">
-      <label for="medewerkerInput">Medewerker Productie / Yard *</label>
-      <input type="text" id="medewerkerInput" placeholder="Vul je naam in...">
+      <label for="medewerkerInput" data-i18n="lbl_user">Medewerker Productie / Yard *</label>
+      <input type="text" id="medewerkerInput" data-i18n-placeholder="ph_user" placeholder="Vul je naam in...">
     </div>
 
     <div class="btn-group">
-      <!-- Direct Inboeken / On Site knop -->
-      <button type="button" class="btn-onsite" onclick="submitStatus('Afgeleverd bij ICS')">🏭 On Site Inboeken (Retour ICS)</button>
-      
-      <!-- Voorbereiden voor transport -->
-      <button type="button" class="btn-ready" onclick="submitStatus('Gereed voor Transport')">✅ Gereedmelden voor Transport</button>
+      <button type="button" class="btn-onsite" onclick="submitStatus('Afgeleverd bij ICS')" data-i18n="btn_onsite">🏭 On Site Inboeken (Retour ICS)</button>
+      <button type="button" class="btn-ready" onclick="submitStatus('Gereed voor Transport')" data-i18n="btn_ready">✅ Gereedmelden voor Transport</button>
     </div>
   </div>
 
   <div id="nextScanArea" style="display: none; text-align: center;">
-    <button type="button" class="btn-next-scan" onclick="startCameraScanner()">📷 SCAN VOLGENDE CONTAINER</button>
+    <button type="button" class="btn-next-scan" onclick="startCameraScanner()" data-i18n="btn_next">📷 SCAN VOLGENDE CONTAINER</button>
   </div>
 </div>
 
 <script>
   var API_URL = "https://script.google.com/macros/s/AKfycbxdnhP7mqyo01b9TvrexIa26pfusuaeGpezCAjojw7XXvZj7Cf6_arQzpoP2ZGyaVAj/exec";
+
+  var currentLang = localStorage.getItem("ics_lang") || (navigator.language.startsWith("nl") ? "nl" : "en");
+
+  var translations = {
+    nl: {
+      badge_mode: "Productie Stand",
+      title_prod: "Productie Scanner",
+      title_scan: "Scan QR (Productie)",
+      msg_loading: "Gegevens ophalen...",
+      msg_saving: "Status opslaan...",
+      lbl_klant: "Klant",
+      lbl_adres: "Afleveradres",
+      lbl_product: "Product",
+      lbl_netto: "Netto Gew.",
+      lbl_user: "Medewerker Productie / Yard *",
+      ph_user: "Vul je naam in...",
+      btn_onsite: "🏭 On Site Inboeken (Retour ICS)",
+      btn_ready: "✅ Gereedmelden voor Transport",
+      btn_next: "📷 SCAN VOLGENDE CONTAINER",
+      alert_name: "Voer a.u.b. je naam in.",
+      err_camera: "Kan camera niet openen."
+    },
+    en: {
+      badge_mode: "Production Mode",
+      title_prod: "Production Scanner",
+      title_scan: "Scan QR (Production)",
+      msg_loading: "Fetching data...",
+      msg_saving: "Saving status...",
+      lbl_klant: "Customer",
+      lbl_adres: "Delivery Address",
+      lbl_product: "Product",
+      lbl_netto: "Net Weight",
+      lbl_user: "Production / Yard Employee *",
+      ph_user: "Enter your name...",
+      btn_onsite: "🏭 Check in On Site (Return ICS)",
+      btn_ready: "✅ Mark Ready for Transport",
+      btn_next: "📷 SCAN NEXT CONTAINER",
+      alert_name: "Please enter your name.",
+      err_camera: "Cannot open camera."
+    }
+  };
 
   var urlParams = new URLSearchParams(window.location.search);
   var currentContainerId = urlParams.get('id') ? urlParams.get('id').trim() : "";
@@ -145,6 +190,7 @@
   var html5QrCode = null;
 
   window.onload = function() {
+    applyLanguage(currentLang);
     var savedUser = localStorage.getItem("ics_prod_user");
     if (savedUser) {
       document.getElementById("medewerkerInput").value = savedUser;
@@ -158,11 +204,33 @@
     loadContainerData(currentContainerId);
   };
 
+  function switchLanguage(lang) {
+    currentLang = lang;
+    localStorage.setItem("ics_lang", lang);
+    applyLanguage(lang);
+  }
+
+  function applyLanguage(lang) {
+    var t = translations[lang] || translations.nl;
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      var key = el.getAttribute('data-i18n');
+      if (t[key]) el.innerText = t[key];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      var key = el.getAttribute('data-i18n-placeholder');
+      if (t[key]) el.placeholder = t[key];
+    });
+
+    document.getElementById("btn-nl").classList.toggle("active", lang === "nl");
+    document.getElementById("btn-en").classList.toggle("active", lang === "en");
+  }
+
   function loadContainerData(containerId) {
+    var t = translations[currentLang];
     currentContainerId = containerId;
     document.getElementById("titleContainer").innerText = containerId;
     document.getElementById("loader").style.display = "block";
-    document.getElementById("loader").innerText = "Gegevens ophalen...";
+    document.getElementById("loader").innerText = t.msg_loading;
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
     document.getElementById("reader").style.display = "none";
@@ -196,9 +264,10 @@
   }
 
   function submitStatus(nieuweStatus) {
+    var t = translations[currentLang];
     var medewerker = document.getElementById("medewerkerInput").value.trim();
     if (!medewerker) {
-      alert("Voer a.u.b. je naam in.");
+      alert(t.alert_name);
       return;
     }
 
@@ -206,7 +275,7 @@
 
     document.getElementById("content").style.display = "none";
     document.getElementById("loader").style.display = "block";
-    document.getElementById("loader").innerText = "Status opslaan...";
+    document.getElementById("loader").innerText = t.msg_saving;
 
     var updateUrl = API_URL + "?action=updateStatus" +
       "&rowIndex=" + currentRowIndex +
@@ -218,7 +287,7 @@
       .then(res => {
         document.getElementById("loader").style.display = "none";
         if (res.success) {
-          showSuccess("Status bijgewerkt naar: " + nieuweStatus);
+          showSuccess(res.message);
         } else {
           showError(res.message);
         }
@@ -232,11 +301,12 @@
   }
 
   function startCameraScanner() {
+    var t = translations[currentLang];
     document.getElementById("content").style.display = "none";
     document.getElementById("nextScanArea").style.display = "none";
     document.getElementById("loader").style.display = "none";
     document.getElementById("statusBadge").style.display = "none";
-    document.getElementById("titleContainer").innerText = "Scan QR (Productie)";
+    document.getElementById("titleContainer").innerText = t.title_scan;
     document.getElementById("alertBox").innerHTML = "";
     
     var readerDiv = document.getElementById("reader");
@@ -246,7 +316,7 @@
 
     html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onQrCodeScanned)
-      .catch(err => showError("Kan camera niet openen."));
+      .catch(err => showError(t.err_camera));
   }
 
   function onQrCodeScanned(qrCodeMessage) {
